@@ -1,6 +1,11 @@
 
 import StatCard from '../components/StatCard'
 import DashboardHeader from '../components/DashboardHeader'
+
+import { useEffect, useState } from 'react'
+import { getFoodTrucks } from '../api/foodTruckApi'
+import type { FoodTruck } from '../api/foodTruckApi'
+
 import type {
   DashboardStat,
   CommissaryVisit,
@@ -10,8 +15,48 @@ interface DashboardProps {
   apiConnected: boolean
 }
 
+
+
+export default function Dashboard({
+  apiConnected,
+}: DashboardProps) {
+
+const [foodTrucks, setFoodTrucks] = useState<FoodTruck[]>([])
+const [trucksLoading, setTrucksLoading] = useState(true)
+const [trucksError, setTrucksError] = useState<string | null>(null)
+
+useEffect(() => {
+  let cancelled = false
+
+  async function loadFoodTrucks() {
+    try {
+      const trucks = await getFoodTrucks()
+
+      if (!cancelled) {
+        setFoodTrucks(trucks)
+      }
+    } catch (error) {
+      if (!cancelled) {
+        setTrucksError(
+          error instanceof Error ? error.message : 'Unknown error'
+        )
+      }
+    } finally {
+      if (!cancelled) {
+        setTrucksLoading(false)
+      }
+    }
+  }
+
+  void loadFoodTrucks()
+
+  return () => {
+    cancelled = true
+  }
+}, [])
+
 const stats: DashboardStat[] = [
-  { label: 'Registered Trucks', value: 12, icon: '🚚' },
+  { label: 'Registered Trucks', value: foodTrucks.length, icon: '🚚' },
   { label: "Today's Visits", value: 8, icon: '📅' },
   { label: 'Pending Check-ins', value: 3, icon: '⏰' },
   { label: 'Compliance Alerts', value: 2, icon: '⚠️' },
@@ -38,9 +83,6 @@ const visits: CommissaryVisit[] = [
   },
 ]
 
-export default function Dashboard({
-  apiConnected,
-}: DashboardProps) {
   return (
     <main className="dashboard">
       <DashboardHeader apiConnected={apiConnected} />
@@ -51,6 +93,25 @@ export default function Dashboard({
         ))}
       </section>
 
+         <div>
+      {trucksLoading
+        ? 'Loading food trucks...'
+        : trucksError
+          ? `API Error: ${trucksError}`
+          : `Loaded ${foodTrucks.length} food truck(s) from PostgreSQL`}
+    </div>
+    <section>
+  <h2>Registered Food Trucks</h2>
+
+  {foodTrucks.map((truck) => (
+    <div key={truck.id}>
+      <h3>{truck.businessName}</h3>
+      <p>Owner: {truck.ownerName}</p>
+      <p>License: {truck.licenseNumber}</p>
+      <p>Status: {truck.active ? 'Active' : 'Inactive'}</p>
+    </div>
+  ))}
+</section>
       <section className="activity-card">
         <div className="section-heading">
           <h2>Today's Commissary Activity</h2>
