@@ -3,12 +3,15 @@ package com.commissaryos.backend.controller;
 
 import com.commissaryos.backend.dto.CreateFoodTruckRequest;
 import com.commissaryos.backend.entity.FoodTruck;
+import com.commissaryos.backend.security.CommissaryUserPrincipal;
+import com.commissaryos.backend.security.TenantAuthorizationService;
 import com.commissaryos.backend.service.FoodTruckService;
 
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,18 +22,26 @@ import java.util.UUID;
 public class FoodTruckController {
 
     private final FoodTruckService foodTruckService;
+    private final TenantAuthorizationService tenantAuthorizationService;
 
     public FoodTruckController(
-            FoodTruckService foodTruckService
+            FoodTruckService foodTruckService,
+            TenantAuthorizationService tenantAuthorizationService
     ) {
         this.foodTruckService = foodTruckService;
+        this.tenantAuthorizationService = tenantAuthorizationService;
     }
 
     @PostMapping
     public ResponseEntity<FoodTruckResponse> register(
             @PathVariable UUID commissaryId,
-            @Valid @RequestBody CreateFoodTruckRequest request
+            @Valid @RequestBody CreateFoodTruckRequest request,
+            @AuthenticationPrincipal CommissaryUserPrincipal principal
     ) {
+        tenantAuthorizationService.verifyAccess(
+            principal, commissaryId
+        );
+
         FoodTruck truck = foodTruckService.registerFoodTruck(
             commissaryId,
             request.businessName(),
@@ -46,8 +57,13 @@ public class FoodTruckController {
 
     @GetMapping
     public List<FoodTruckResponse> getAll(
-            @PathVariable UUID commissaryId
+            @PathVariable UUID commissaryId,
+            @AuthenticationPrincipal CommissaryUserPrincipal principal
     ) {
+        tenantAuthorizationService.verifyAccess(
+            principal, commissaryId
+        );
+
         return foodTruckService
             .getTrucksByCommissary(commissaryId)
             .stream()
@@ -58,8 +74,13 @@ public class FoodTruckController {
     @GetMapping("/{truckId}")
     public FoodTruckResponse getById(
             @PathVariable UUID commissaryId,
-            @PathVariable UUID truckId
+            @PathVariable UUID truckId,
+            @AuthenticationPrincipal CommissaryUserPrincipal principal
     ) {
+        tenantAuthorizationService.verifyAccess(
+            principal, commissaryId
+        );
+
         FoodTruck truck = foodTruckService.getTruck(
             commissaryId,
             truckId

@@ -3,8 +3,13 @@ import StatCard from '../components/StatCard'
 import DashboardHeader from '../components/DashboardHeader'
 
 import { useEffect, useState } from 'react'
-import { getFoodTrucks } from '../api/foodTruckApi'
+import {
+  getFoodTrucks,
+  getFoodTruckById,
+} from '../api/foodTruckApi'
 import type { FoodTruck } from '../api/foodTruckApi'
+import AddFoodTruckForm from '../components/AddFoodTruckForm'
+
 
 import type {
   DashboardStat,
@@ -22,8 +27,12 @@ export default function Dashboard({
 }: DashboardProps) {
 
 const [foodTrucks, setFoodTrucks] = useState<FoodTruck[]>([])
+const [searchTerm, setSearchTerm] = useState('')
 const [trucksLoading, setTrucksLoading] = useState(true)
 const [trucksError, setTrucksError] = useState<string | null>(null)
+const [selectedTruck, setSelectedTruck] = useState<FoodTruck | null>(null)
+const [detailsLoading, setDetailsLoading] = useState(false)
+const [detailsError, setDetailsError] = useState<string | null>(null)
 
 useEffect(() => {
   let cancelled = false
@@ -82,7 +91,31 @@ const visits: CommissaryVisit[] = [
     status: 'ACTION_NEEDED',
   },
 ]
+const filteredFoodTrucks = foodTrucks.filter((truck) => {
+  const query = searchTerm.toLowerCase().trim()
 
+  return (
+    truck.businessName.toLowerCase().includes(query) ||
+    truck.ownerName.toLowerCase().includes(query) ||
+    truck.licenseNumber.toLowerCase().includes(query)
+  )
+})
+async function handleTruckClick(truckId: string) {
+  setDetailsLoading(true)
+  setDetailsError(null)
+  setSelectedTruck(null)
+
+  try {
+    const truck = await getFoodTruckById(truckId)
+    setSelectedTruck(truck)
+  } catch (error) {
+    setDetailsError(
+      error instanceof Error ? error.message : 'Unable to load truck'
+    )
+  } finally {
+    setDetailsLoading(false)
+  }
+}
   return (
     <main className="dashboard">
       <DashboardHeader apiConnected={apiConnected} />
@@ -100,17 +133,67 @@ const visits: CommissaryVisit[] = [
           ? `API Error: ${trucksError}`
           : `Loaded ${foodTrucks.length} food truck(s) from PostgreSQL`}
     </div>
+    <section className="add-truck-section">
+  <AddFoodTruckForm
+    onTruckCreated={(newTruck) => {
+      setFoodTrucks(previous => [...previous, newTruck])
+    }}
+  />
+</section>
     <section>
   <h2>Registered Food Trucks</h2>
+  <input
+  type="search"
+  placeholder="Search by business, owner, or license..."
+  value={searchTerm}
+  onChange={(event) => setSearchTerm(event.target.value)}
+/>
 
-  {foodTrucks.map((truck) => (
+   {/* {filteredFoodTrucks.map((truck) =>(
+  //foodTrucks.map((truck) => (
     <div key={truck.id}>
       <h3>{truck.businessName}</h3>
       <p>Owner: {truck.ownerName}</p>
       <p>License: {truck.licenseNumber}</p>
       <p>Status: {truck.active ? 'Active' : 'Inactive'}</p>
     </div>
-  ))}
+  ))}  */}
+  {filteredFoodTrucks.map((truck) => (
+  <div key={truck.id}>
+    <button
+      type="button"
+      onClick={() => handleTruckClick(truck.id)}
+    >
+      {truck.businessName}
+    </button>
+
+    <p>Owner: {truck.ownerName}</p>
+    <p>License: {truck.licenseNumber}</p>
+    <p>Status: {truck.active ? 'Active' : 'Inactive'}</p>
+  </div>
+))}
+</section>
+<section className="truck-details">
+  <h2>Food Truck Details</h2>
+
+  {detailsLoading && <p>Loading truck details...</p>}
+
+  {detailsError && (
+    <p role="alert">Error: {detailsError}</p>
+  )}
+
+  {selectedTruck && (
+    <div>
+      <h3>{selectedTruck.businessName}</h3>
+      <p>Truck ID: {selectedTruck.id}</p>
+      <p>Owner: {selectedTruck.ownerName}</p>
+      <p>License: {selectedTruck.licenseNumber}</p>
+      <p>Email: {selectedTruck.contactEmail}</p>
+      <p>
+        Status: {selectedTruck.active ? 'Active' : 'Inactive'}
+      </p>
+    </div>
+  )}
 </section>
       <section className="activity-card">
         <div className="section-heading">
